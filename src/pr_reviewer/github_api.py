@@ -71,6 +71,15 @@ def is_excluded(path: str, patterns: list[str]) -> bool:
     return any(re.match(_glob_to_regex(pat), path) for pat in patterns)
 
 
+def _include(f: ChangedFile, exclude: list[str]) -> bool:
+    """Decide whether a changed file should be sent to the reviewer."""
+    if not f.patch:  # binary or otherwise no textual diff
+        return False
+    if f.status == "removed":  # a pure deletion has nothing to review
+        return False
+    return not is_excluded(f.path, exclude)
+
+
 def collect_diff(settings, event: PullRequestEvent) -> str:
     """Fetch the PR diff, honoring the max-diff budget and exclude patterns. (Phase 2)"""
     # TODO(phase-2): fetch via the GitHub API, filter excluded/generated files, and
