@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from dataclasses import dataclass
 
 
@@ -30,6 +31,37 @@ def load_event() -> "PullRequestEvent | None":
     full = repo.get("full_name", "/")
     owner, _, name = full.partition("/")
     return PullRequestEvent(owner=owner, repo=name, number=pr.get("number"))
+
+
+def _glob_to_regex(pattern: str) -> str:
+    """Translate a gitignore-style glob into a regex anchored to the whole path.
+
+    `**/` matches zero or more leading directories, `**` matches across separators,
+    `*` matches within a single path segment, `?` matches one non-separator char.
+    """
+    i, n = 0, len(pattern)
+    out: list[str] = []
+    while i < n:
+        if pattern.startswith("**/", i):
+            out.append("(?:.*/)?")
+            i += 3
+        elif pattern.startswith("**", i):
+            out.append(".*")
+            i += 2
+        elif pattern[i] == "*":
+            out.append("[^/]*")
+            i += 1
+        elif pattern[i] == "?":
+            out.append("[^/]")
+            i += 1
+        else:
+            out.append(re.escape(pattern[i]))
+            i += 1
+    return "(?s:" + "".join(out) + r")\Z"
+
+
+def is_excluded(path: str, patterns: list[str]) -> bool:
+    return any(re.match(_glob_to_regex(pat), path) for pat in patterns)
 
 
 def collect_diff(settings, event: PullRequestEvent) -> str:
