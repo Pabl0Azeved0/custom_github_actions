@@ -138,10 +138,10 @@ def _apply_budget(diff: str, max_bytes: int) -> str:
 
 
 def collect_diff(settings, event: PullRequestEvent) -> str:
-    """Fetch the PR diff, honoring the max-diff budget and exclude patterns. (Phase 2)"""
-    # TODO(phase-2): fetch via the GitHub API, filter excluded/generated files, and
-    # enforce settings.max_diff_bytes. Returns empty until implemented.
-    return ""
+    """Fetch the PR diff and drop excluded/binary/deleted files."""
+    files = fetch_changed_files(settings, event)
+    included = [f for f in files if _include(f, settings.exclude)]
+    return _render(included)
 
 
 def post_review(settings, event: PullRequestEvent, findings: list) -> None:

@@ -62,3 +62,18 @@ def test_apply_budget_truncates():
     out = gh._apply_budget("x" * 100, 10)
     assert out.startswith("x" * 10)
     assert "truncated" in out
+
+
+def test_collect_diff_filters(monkeypatch):
+    files = [
+        ChangedFile("src/a.py", "modified", "@@ a"),
+        ChangedFile("poetry.lock", "modified", "@@ lock"),
+        ChangedFile("img.png", "added", ""),
+    ]
+    monkeypatch.setattr(gh, "fetch_changed_files", lambda s, e: files)
+    s = Settings()
+    s.exclude = ["**/*.lock"]
+    diff = gh.collect_diff(s, PullRequestEvent("o", "r", 1))
+    assert "src/a.py" in diff
+    assert "poetry.lock" not in diff
+    assert "img.png" not in diff
