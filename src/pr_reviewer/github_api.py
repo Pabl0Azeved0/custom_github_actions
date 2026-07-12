@@ -129,6 +129,14 @@ def _render(files: "list[ChangedFile]") -> str:
     return "\n\n".join(f"--- {f.path} ({f.status})\n{f.patch}" for f in files)
 
 
+def _apply_budget(diff: str, max_bytes: int) -> str:
+    encoded = diff.encode("utf-8")
+    if len(encoded) <= max_bytes:
+        return diff
+    truncated = encoded[:max_bytes].decode("utf-8", "ignore")
+    return truncated + "\n\n[... diff truncated to fit the review budget ...]"
+
+
 def collect_diff(settings, event: PullRequestEvent) -> str:
     """Fetch the PR diff, honoring the max-diff budget and exclude patterns. (Phase 2)"""
     # TODO(phase-2): fetch via the GitHub API, filter excluded/generated files, and

@@ -52,3 +52,13 @@ def test_render():
     out = gh._render([ChangedFile("a.py", "modified", "PATCH")])
     assert "--- a.py (modified)" in out
     assert "PATCH" in out
+
+
+def test_apply_budget_passthrough():
+    assert gh._apply_budget("short", 100) == "short"
+
+
+def test_apply_budget_truncates():
+    out = gh._apply_budget("x" * 100, 10)
+    assert out.startswith("x" * 10)
+    assert "truncated" in out
