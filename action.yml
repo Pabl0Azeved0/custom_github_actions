@@ -1,0 +1,62 @@
+name: "AI PR Reviewer"
+description: "Run a pluggable LLM code review on pull requests and post few, high-confidence findings as inline comments."
+author: "Pablo"
+branding:
+  icon: "check-circle"
+  color: "green"
+
+inputs:
+  github-token:
+    description: "Token used to read the PR diff and post review comments. Usually ${{ secrets.GITHUB_TOKEN }}."
+    required: true
+  llm-api-key:
+    description: "API key for the LLM provider, supplied as a repository secret."
+    required: true
+  llm-provider:
+    description: "LLM provider to use (groq)."
+    required: false
+    default: "groq"
+  llm-model:
+    description: "Model id for the provider."
+    required: false
+    default: "llama-3.3-70b-versatile"
+  strictness:
+    description: "Review strictness: low, balanced, or high. Higher surfaces more findings."
+    required: false
+    default: "balanced"
+  max-findings:
+    description: "Maximum number of findings to post, to avoid comment spam."
+    required: false
+    default: "10"
+  max-diff-bytes:
+    description: "Maximum diff size (bytes) sent to the LLM. Larger diffs are truncated."
+    required: false
+    default: "60000"
+  exclude:
+    description: "Newline- or comma-separated glob patterns for files to skip (lock/generated files)."
+    required: false
+    default: |
+      **/*.lock
+      **/package-lock.json
+      **/poetry.lock
+      **/yarn.lock
+      **/pnpm-lock.yaml
+      **/*.min.js
+      **/*.min.css
+      **/dist/**
+      **/build/**
+      **/*.svg
+      **/*.png
+      **/*.jpg
+  fail-on-findings:
+    description: "If true, exit non-zero when findings are posted. Report-only (false) by default."
+    required: false
+    default: "false"
+  slack-webhook:
+    description: "Optional Slack incoming-webhook URL to post a review summary. Empty disables it."
+    required: false
+    default: ""
+
+runs:
+  using: "docker"
+  image: "Dockerfile"

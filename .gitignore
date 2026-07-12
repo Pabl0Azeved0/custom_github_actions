@@ -1,0 +1,10 @@
+# Allow commit only to README file, every other md file kept local
+*.md
+!README.md
+
+# Build / test artifacts
+__pycache__/
+*.pyc
+.venv/
+.env
+.pytest_cache/
