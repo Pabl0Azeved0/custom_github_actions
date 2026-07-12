@@ -138,10 +138,20 @@ def _apply_budget(diff: str, max_bytes: int) -> str:
 
 
 def collect_diff(settings, event: PullRequestEvent) -> str:
-    """Fetch the PR diff and drop excluded/binary/deleted files."""
+    """Fetch the PR diff, drop excluded/binary/deleted files, and enforce the byte budget."""
     files = fetch_changed_files(settings, event)
     included = [f for f in files if _include(f, settings.exclude)]
-    return _render(included)
+    diff = _render(included)
+    budgeted = _apply_budget(diff, settings.max_diff_bytes)
+    truncated = len(budgeted) != len(diff)
+    log.info(
+        "diff: %d/%d file(s) included, %d bytes%s",
+        len(included),
+        len(files),
+        len(budgeted.encode("utf-8")),
+        " (truncated)" if truncated else "",
+    )
+    return budgeted
 
 
 def post_review(settings, event: PullRequestEvent, findings: list) -> None:

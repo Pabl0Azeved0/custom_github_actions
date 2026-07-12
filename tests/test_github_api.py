@@ -77,3 +77,14 @@ def test_collect_diff_filters(monkeypatch):
     assert "src/a.py" in diff
     assert "poetry.lock" not in diff
     assert "img.png" not in diff
+
+
+def test_collect_diff_truncates(monkeypatch):
+    monkeypatch.setattr(
+        gh, "fetch_changed_files", lambda s, e: [ChangedFile("a.py", "modified", "y" * 500)]
+    )
+    s = Settings()
+    s.exclude = []
+    s.max_diff_bytes = 50
+    out = gh.collect_diff(s, PullRequestEvent("o", "r", 1))
+    assert "truncated" in out
