@@ -46,3 +46,9 @@ def test_fetch_changed_files(monkeypatch):
     files = gh.fetch_changed_files(Settings(), PullRequestEvent("o", "r", 1))
     assert len(files) == 1
     assert files[0].path == "a.py"
+
+
+def test_render():
+    out = gh._render([ChangedFile("a.py", "modified", "PATCH")])
+    assert "--- a.py (modified)" in out
+    assert "PATCH" in out

@@ -125,6 +125,10 @@ def fetch_changed_files(settings, event: PullRequestEvent) -> "list[ChangedFile]
     ]
 
 
+def _render(files: "list[ChangedFile]") -> str:
+    return "\n\n".join(f"--- {f.path} ({f.status})\n{f.patch}" for f in files)
+
+
 def collect_diff(settings, event: PullRequestEvent) -> str:
     """Fetch the PR diff, honoring the max-diff budget and exclude patterns. (Phase 2)"""
     # TODO(phase-2): fetch via the GitHub API, filter excluded/generated files, and
