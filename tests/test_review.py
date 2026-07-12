@@ -2,6 +2,7 @@ import json
 
 from pr_reviewer import review as review_mod
 from pr_reviewer.config import Settings
+from tests.fakes import ScriptedLLM
 
 SAMPLE_DIFF = "--- path/to/file.py (modified)\n@@ -1,2 +1,2 @@\n-old\n+new\n"
 
@@ -53,3 +54,26 @@ def test_parse_findings_skips_item_missing_message():
     findings = review_mod.parse_findings(raw)
     assert len(findings) == 1
     assert findings[0].path == "a.py"
+
+
+def test_review_diff_empty_diff_skips_provider(monkeypatch):
+    scripted = ScriptedLLM(response="[]")
+    monkeypatch.setattr(review_mod, "get_provider", lambda settings: scripted)
+    assert review_mod.review_diff(Settings(), "   \n") == []
+    assert scripted.prompts == []
+
+
+def test_review_diff_caps_at_max_findings(monkeypatch):
+    raw = json.dumps(
+        [
+            {"path": "a.py", "line": 1, "message": "one"},
+            {"path": "b.py", "line": 2, "message": "two"},
+            {"path": "c.py", "line": 3, "message": "three"},
+        ]
+    )
+    scripted = ScriptedLLM(response=raw)
+    monkeypatch.setattr(review_mod, "get_provider", lambda settings: scripted)
+    s = Settings()
+    s.max_findings = 2
+    findings = review_mod.review_diff(s, SAMPLE_DIFF)
+    assert len(findings) == 2

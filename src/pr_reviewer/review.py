@@ -5,6 +5,8 @@ import json
 import logging
 from dataclasses import dataclass
 
+from pr_reviewer.llm.provider import get_provider
+
 logger = logging.getLogger("pr-reviewer")
 
 _STRICTNESS_GUIDANCE = {
@@ -86,10 +88,9 @@ def parse_findings(raw: str) -> "list[Finding]":
 
 
 def review_diff(settings, diff: str) -> "list[Finding]":
-    """Send the diff to the LLM and parse findings. (Phase 3)
-
-    Scaffold stub: returns no findings until the provider wiring lands.
-    """
-    # TODO(phase-3): call get_provider(settings).generate(build_prompt(...)), then
-    # parse_findings(raw) and cap at settings.max_findings.
-    return []
+    """Send the diff to the LLM and parse findings, capped at settings.max_findings."""
+    if not diff.strip():
+        return []
+    raw = get_provider(settings).generate(build_prompt(settings, diff))
+    findings = parse_findings(raw)
+    return findings[: settings.max_findings]
