@@ -5,9 +5,16 @@ Scaffold stubs — the real diff collection and Reviews-API posting land in late
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 from dataclasses import dataclass
+
+import requests
+
+log = logging.getLogger("pr-reviewer")
+
+_API_ROOT = "https://api.github.com"
 
 
 @dataclass
@@ -78,6 +85,32 @@ def _include(f: ChangedFile, exclude: list[str]) -> bool:
     if f.status == "removed":  # a pure deletion has nothing to review
         return False
     return not is_excluded(f.path, exclude)
+
+
+def _get(settings, url: str, params: "dict | None" = None) -> requests.Response:
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+    if settings.github_token:
+        headers["Authorization"] = f"Bearer {settings.github_token}"
+    resp = requests.get(url, headers=headers, params=params, timeout=60)
+    resp.raise_for_status()
+    return resp
+
+
+def _paginate(settings, url: str) -> "list[dict]":
+    items: list[dict] = []
+    page = 1
+    while True:
+        batch = _get(settings, url, params={"per_page": 100, "page": page}).json()
+        if not batch:
+            break
+        items.extend(batch)
+        if len(batch) < 100:
+            break
+        page += 1
+    return items
 
 
 def collect_diff(settings, event: PullRequestEvent) -> str:
