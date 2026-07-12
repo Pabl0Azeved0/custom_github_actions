@@ -17,6 +17,13 @@ class PullRequestEvent:
     number: int
 
 
+@dataclass
+class ChangedFile:
+    path: str
+    status: str
+    patch: str  # unified diff hunk for this file ("" when GitHub omits it, e.g. binaries)
+
+
 def load_event() -> "PullRequestEvent | None":
     """Parse the pull_request event payload GitHub writes to GITHUB_EVENT_PATH."""
     path = os.getenv("GITHUB_EVENT_PATH")
