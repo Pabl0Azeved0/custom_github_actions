@@ -113,6 +113,18 @@ def _paginate(settings, url: str) -> "list[dict]":
     return items
 
 
+def fetch_changed_files(settings, event: PullRequestEvent) -> "list[ChangedFile]":
+    url = f"{_API_ROOT}/repos/{event.owner}/{event.repo}/pulls/{event.number}/files"
+    return [
+        ChangedFile(
+            path=f.get("filename", ""),
+            status=f.get("status", ""),
+            patch=f.get("patch", "") or "",
+        )
+        for f in _paginate(settings, url)
+    ]
+
+
 def collect_diff(settings, event: PullRequestEvent) -> str:
     """Fetch the PR diff, honoring the max-diff budget and exclude patterns. (Phase 2)"""
     # TODO(phase-2): fetch via the GitHub API, filter excluded/generated files, and

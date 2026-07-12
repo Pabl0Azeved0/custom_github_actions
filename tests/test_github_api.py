@@ -1,5 +1,6 @@
 from pr_reviewer import github_api as gh
-from pr_reviewer.github_api import ChangedFile
+from pr_reviewer.config import Settings
+from pr_reviewer.github_api import ChangedFile, PullRequestEvent
 
 
 def test_is_excluded_lock_and_dist():
@@ -22,3 +23,26 @@ def test_include_decision():
     assert not gh._include(ChangedFile("img.png", "added", ""), ex)
     assert not gh._include(ChangedFile("src/a.py", "removed", "@@"), ex)
     assert not gh._include(ChangedFile("poetry.lock", "modified", "@@"), ex)
+
+
+class _FakeResp:
+    def __init__(self, data):
+        self._data = data
+
+    def json(self):
+        return self._data
+
+    def raise_for_status(self):
+        pass
+
+
+def test_fetch_changed_files(monkeypatch):
+    def fake_get(settings, url, params=None):
+        if params["page"] == 1:
+            return _FakeResp([{"filename": "a.py", "status": "modified", "patch": "@@"}])
+        return _FakeResp([])
+
+    monkeypatch.setattr(gh, "_get", fake_get)
+    files = gh.fetch_changed_files(Settings(), PullRequestEvent("o", "r", 1))
+    assert len(files) == 1
+    assert files[0].path == "a.py"
