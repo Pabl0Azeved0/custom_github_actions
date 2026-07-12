@@ -1,3 +1,5 @@
+import json
+
 from pr_reviewer import review as review_mod
 from pr_reviewer.config import Settings
 
@@ -11,3 +13,43 @@ def test_build_prompt_contains_key_pieces():
     assert "Do NOT report style" in prompt
     assert SAMPLE_DIFF in prompt
     assert "7" in prompt
+
+
+def test_parse_findings_two_valid_items():
+    raw = json.dumps(
+        [
+            {"path": "a.py", "line": 3, "severity": "high", "message": "bug here"},
+            {"path": "b.py", "line": 10, "severity": "low", "message": "dead code"},
+        ]
+    )
+    findings = review_mod.parse_findings(raw)
+    assert len(findings) == 2
+    assert findings[0] == review_mod.Finding(
+        path="a.py", line=3, severity="high", message="bug here"
+    )
+    assert findings[1] == review_mod.Finding(
+        path="b.py", line=10, severity="low", message="dead code"
+    )
+
+
+def test_parse_findings_strips_markdown_fence():
+    raw = "```json\n" + json.dumps([{"path": "a.py", "line": 1, "message": "issue"}]) + "\n```"
+    findings = review_mod.parse_findings(raw)
+    assert len(findings) == 1
+    assert findings[0].path == "a.py"
+
+
+def test_parse_findings_non_json_returns_empty():
+    assert review_mod.parse_findings("not json at all") == []
+
+
+def test_parse_findings_skips_item_missing_message():
+    raw = json.dumps(
+        [
+            {"path": "a.py", "line": 1, "message": "real issue"},
+            {"path": "b.py", "line": 2},
+        ]
+    )
+    findings = review_mod.parse_findings(raw)
+    assert len(findings) == 1
+    assert findings[0].path == "a.py"

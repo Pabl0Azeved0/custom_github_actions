@@ -1,7 +1,11 @@
 """Turn a PR diff into a small set of high-confidence findings via the LLM. (Phase 3)"""
 from __future__ import annotations
 
+import json
+import logging
 from dataclasses import dataclass
+
+logger = logging.getLogger("pr-reviewer")
 
 _STRICTNESS_GUIDANCE = {
     "lenient": "Only flag issues you are highly confident are real problems; when in doubt, say nothing.",
@@ -42,11 +46,50 @@ Diff:
 {diff}"""
 
 
+def parse_findings(raw: str) -> "list[Finding]":
+    """Parse the LLM's raw response into Finding objects, tolerating malformed output."""
+    text = raw.strip()
+    if text.startswith("```"):
+        text = text.split("\n", 1)[1] if "\n" in text else ""
+        if text.endswith("```"):
+            text = text[: -len("```")]
+        text = text.strip()
+
+    try:
+        data = json.loads(text)
+    except (ValueError, TypeError):
+        logger.warning("failed to parse LLM findings as JSON")
+        return []
+
+    if isinstance(data, dict):
+        data = data.get("findings", [])
+    if not isinstance(data, list):
+        return []
+
+    findings: list[Finding] = []
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        path = item.get("path")
+        message = item.get("message")
+        if not path or not message:
+            continue
+        try:
+            line = int(item.get("line", 0))
+        except (TypeError, ValueError):
+            line = 0
+        severity = str(item.get("severity", "")).lower()
+        if severity not in {"high", "medium", "low"}:
+            severity = "medium"
+        findings.append(Finding(path=path, line=line, severity=severity, message=message))
+    return findings
+
+
 def review_diff(settings, diff: str) -> "list[Finding]":
     """Send the diff to the LLM and parse findings. (Phase 3)
 
-    Scaffold stub: returns no findings until the parser + provider wiring land.
+    Scaffold stub: returns no findings until the provider wiring lands.
     """
-    # TODO(phase-3): call get_provider(settings).generate(build_prompt(...)), parse JSON
-    # findings, cap at settings.max_findings.
+    # TODO(phase-3): call get_provider(settings).generate(build_prompt(...)), then
+    # parse_findings(raw) and cap at settings.max_findings.
     return []
