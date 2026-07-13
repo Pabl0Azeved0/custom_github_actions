@@ -115,3 +115,40 @@ def test_split_findings():
     )
     assert [f.message for f in anchored] == ["on a diff line"]
     assert len(unanchored) == 3
+
+
+def test_summary_body_no_findings():
+    body = gh._summary_body([], [])
+    assert gh._SUMMARY_MARKER in body
+    assert "No findings" in body
+
+
+def test_summary_body_lists_unanchored():
+    unanchored = [Finding("a.py", 0, "high", "boom")]
+    body = gh._summary_body(unanchored, unanchored)
+    assert "Found **1** potential issue." in body
+    assert "`a.py`" in body
+    assert "boom" in body
+
+
+def test_sync_summary_posts_when_absent(monkeypatch):
+    calls = {}
+    monkeypatch.setattr(gh, "_paginate", lambda s, url: [])
+    monkeypatch.setattr(gh, "_post", lambda s, url, payload: calls.update(post=(url, payload)))
+    monkeypatch.setattr(gh, "_patch", lambda s, url, payload: calls.update(patch=url))
+    gh._sync_summary(Settings(), PullRequestEvent("o", "r", 7), [], [])
+    assert "patch" not in calls
+    assert "/issues/7/comments" in calls["post"][0]
+    assert gh._SUMMARY_MARKER in calls["post"][1]["body"]
+
+
+def test_sync_summary_patches_when_present(monkeypatch):
+    calls = {}
+    monkeypatch.setattr(
+        gh, "_paginate", lambda s, url: [{"id": 42, "body": gh._SUMMARY_MARKER + " old"}]
+    )
+    monkeypatch.setattr(gh, "_post", lambda s, url, payload: calls.update(post=url))
+    monkeypatch.setattr(gh, "_patch", lambda s, url, payload: calls.update(patch=url))
+    gh._sync_summary(Settings(), PullRequestEvent("o", "r", 7), [], [])
+    assert "post" not in calls
+    assert calls["patch"].endswith("/issues/comments/42")

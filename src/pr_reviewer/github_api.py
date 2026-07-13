@@ -16,6 +16,13 @@ log = logging.getLogger("pr-reviewer")
 
 _API_ROOT = "https://api.github.com"
 
+# Hidden markers let us find our own comments on re-push and update them in place
+# instead of piling up duplicates. They render as nothing in the GitHub UI.
+_SUMMARY_MARKER = "<!-- pr-reviewer:summary -->"
+_INLINE_MARKER = "<!-- pr-reviewer:inline -->"
+
+_SEVERITY_EMOJI = {"high": "🔴", "medium": "🟠", "low": "🟡"}
+
 
 @dataclass
 class PullRequestEvent:
@@ -209,6 +216,46 @@ def _split_findings(findings: list, commentable: "dict[str, set[int]]") -> tuple
         else:
             unanchored.append(f)
     return anchored, unanchored
+
+
+def _finding_line(f) -> str:
+    emoji = _SEVERITY_EMOJI.get(f.severity, "")
+    where = f"`{f.path}:{f.line}`" if f.line else f"`{f.path}`"
+    return f"- {emoji} **{f.severity}** {where} — {f.message}"
+
+
+def _summary_body(findings: list, unanchored: list) -> str:
+    """Build the summary comment. Anchored findings show inline; unanchored list here."""
+    lines = [_SUMMARY_MARKER, "## 🤖 AI code review", ""]
+    if not findings:
+        lines.append("No findings — nothing stood out. 🎉")
+    else:
+        n = len(findings)
+        lines.append(f"Found **{n}** potential issue{'s' if n != 1 else ''}.")
+        if unanchored:
+            lines += ["", "Not tied to a specific diff line:", ""]
+            lines += [_finding_line(f) for f in unanchored]
+    lines += ["", "_Report-only — this review never fails your build._"]
+    return "\n".join(lines)
+
+
+def _find_comment(settings, event: PullRequestEvent, marker: str) -> "int | None":
+    """Return the id of our previous summary comment (by hidden marker), if any."""
+    url = f"{_API_ROOT}/repos/{event.owner}/{event.repo}/issues/{event.number}/comments"
+    for c in _paginate(settings, url):
+        if marker in (c.get("body") or ""):
+            return c.get("id")
+    return None
+
+
+def _sync_summary(settings, event: PullRequestEvent, findings: list, unanchored: list) -> None:
+    body = _summary_body(findings, unanchored)
+    existing = _find_comment(settings, event, _SUMMARY_MARKER)
+    base = f"{_API_ROOT}/repos/{event.owner}/{event.repo}/issues"
+    if existing is not None:
+        _patch(settings, f"{base}/comments/{existing}", {"body": body})
+    else:
+        _post(settings, f"{base}/{event.number}/comments", {"body": body})
 
 
 def post_review(settings, event: PullRequestEvent, findings: list) -> None:
