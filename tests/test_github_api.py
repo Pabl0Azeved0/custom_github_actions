@@ -1,6 +1,7 @@
 from pr_reviewer import github_api as gh
 from pr_reviewer.config import Settings
 from pr_reviewer.github_api import ChangedFile, PullRequestEvent
+from pr_reviewer.review import Finding
 
 
 def test_is_excluded_lock_and_dist():
@@ -88,3 +89,29 @@ def test_collect_diff_truncates(monkeypatch):
     s.max_diff_bytes = 50
     out = gh.collect_diff(s, PullRequestEvent("o", "r", 1))
     assert "truncated" in out
+
+
+def test_commentable_lines():
+    patch = "@@ -10,3 +10,4 @@\n ctx\n+added1\n+added2\n-removed\n ctx2"
+    # new-file lines: 10 ctx, 11 added1, 12 added2, (removed doesn't advance), 13 ctx2
+    assert gh._commentable_lines(patch) == {10, 11, 12, 13}
+
+
+def test_commentable_lines_only_added_are_new():
+    patch = "@@ -1,0 +1,2 @@\n+x\n+y"
+    assert gh._commentable_lines(patch) == {1, 2}
+
+
+def test_split_findings():
+    commentable = {"a.py": {5, 6}}
+    anchored, unanchored = gh._split_findings(
+        [
+            Finding("a.py", 5, "high", "on a diff line"),
+            Finding("a.py", 99, "low", "line not in diff"),
+            Finding("b.py", 5, "low", "file not in diff"),
+            Finding("a.py", 0, "low", "no line"),
+        ],
+        commentable,
+    )
+    assert [f.message for f in anchored] == ["on a diff line"]
+    assert len(unanchored) == 3

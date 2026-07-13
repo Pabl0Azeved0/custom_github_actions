@@ -176,6 +176,41 @@ def collect_diff(settings, event: PullRequestEvent) -> str:
     return budgeted
 
 
+def _commentable_lines(patch: str) -> "set[int]":
+    """New-file line numbers the Reviews API will accept an inline comment on.
+
+    The Reviews API rejects the whole review if any comment points at a line outside the
+    diff, so we only anchor to lines present in a hunk: added (`+`) and context lines on
+    the right side. Deleted (`-`) lines don't advance the new-file counter.
+    """
+    lines: "set[int]" = set()
+    new_ln = 0
+    for row in patch.splitlines():
+        if row.startswith("@@"):
+            m = re.search(r"\+(\d+)", row)
+            new_ln = int(m.group(1)) if m else 0
+        elif row.startswith("+"):
+            lines.add(new_ln)
+            new_ln += 1
+        elif row.startswith("-") or row.startswith("\\"):
+            continue
+        else:  # context line — present in the new file, so commentable
+            lines.add(new_ln)
+            new_ln += 1
+    return lines
+
+
+def _split_findings(findings: list, commentable: "dict[str, set[int]]") -> tuple:
+    """Partition findings into those anchorable to a diff line and those that aren't."""
+    anchored, unanchored = [], []
+    for f in findings:
+        if f.line and f.line in commentable.get(f.path, set()):
+            anchored.append(f)
+        else:
+            unanchored.append(f)
+    return anchored, unanchored
+
+
 def post_review(settings, event: PullRequestEvent, findings: list) -> None:
     """Post a summary + inline comments via the Reviews API, updating on re-push. (Phase 4)"""
     # TODO(phase-4): post via the Reviews API with a stable marker so re-pushes update
