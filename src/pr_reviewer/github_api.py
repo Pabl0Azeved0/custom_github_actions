@@ -87,14 +87,36 @@ def _include(f: ChangedFile, exclude: list[str]) -> bool:
     return not is_excluded(f.path, exclude)
 
 
-def _get(settings, url: str, params: "dict | None" = None) -> requests.Response:
+def _headers(settings) -> dict:
     headers = {
         "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
     }
     if settings.github_token:
         headers["Authorization"] = f"Bearer {settings.github_token}"
-    resp = requests.get(url, headers=headers, params=params, timeout=60)
+    return headers
+
+
+def _get(settings, url: str, params: "dict | None" = None) -> requests.Response:
+    resp = requests.get(url, headers=_headers(settings), params=params, timeout=60)
+    resp.raise_for_status()
+    return resp
+
+
+def _post(settings, url: str, payload: dict) -> requests.Response:
+    resp = requests.post(url, headers=_headers(settings), json=payload, timeout=60)
+    resp.raise_for_status()
+    return resp
+
+
+def _patch(settings, url: str, payload: dict) -> requests.Response:
+    resp = requests.patch(url, headers=_headers(settings), json=payload, timeout=60)
+    resp.raise_for_status()
+    return resp
+
+
+def _delete(settings, url: str) -> requests.Response:
+    resp = requests.delete(url, headers=_headers(settings), timeout=60)
     resp.raise_for_status()
     return resp
 
