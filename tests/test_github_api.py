@@ -200,3 +200,19 @@ def test_sync_inline_skips_post_when_empty(monkeypatch):
         gh, "_post", lambda *a, **k: (_ for _ in ()).throw(AssertionError("should not post"))
     )
     gh._sync_inline(Settings(), PullRequestEvent("o", "r", 3), [])
+
+
+def test_post_review_routes_findings(monkeypatch):
+    monkeypatch.setattr(
+        gh, "fetch_changed_files", lambda s, e: [ChangedFile("a.py", "modified", "@@ -1 +1,2 @@\n+x\n+y")]
+    )
+    summary, inline = {}, {}
+    monkeypatch.setattr(
+        gh, "_sync_summary", lambda s, e, f, u: summary.update(findings=f, unanchored=u)
+    )
+    monkeypatch.setattr(gh, "_sync_inline", lambda s, e, a: inline.update(anchored=a))
+    findings = [Finding("a.py", 1, "high", "anchored"), Finding("a.py", 99, "low", "floating")]
+    gh.post_review(Settings(), PullRequestEvent("o", "r", 3), findings)
+    assert [f.message for f in inline["anchored"]] == ["anchored"]
+    assert [f.message for f in summary["unanchored"]] == ["floating"]
+    assert summary["findings"] == findings

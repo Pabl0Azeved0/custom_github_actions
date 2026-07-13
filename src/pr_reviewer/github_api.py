@@ -290,7 +290,13 @@ def _sync_inline(settings, event: PullRequestEvent, anchored: list) -> None:
 
 
 def post_review(settings, event: PullRequestEvent, findings: list) -> None:
-    """Post a summary + inline comments via the Reviews API, updating on re-push. (Phase 4)"""
-    # TODO(phase-4): post via the Reviews API with a stable marker so re-pushes update
-    # rather than duplicate; cap at settings.max_findings.
-    return None
+    """Post/update a summary comment and inline review comments for the findings.
+
+    Idempotent across re-pushes: hidden markers identify our own comments, so the summary
+    is edited in place and stale inline comments are replaced instead of duplicated.
+    Findings on a diff line become inline comments; the rest are listed in the summary.
+    """
+    commentable = _commentable_map(settings, event)
+    anchored, unanchored = _split_findings(findings, commentable)
+    _sync_summary(settings, event, findings, unanchored)
+    _sync_inline(settings, event, anchored)
