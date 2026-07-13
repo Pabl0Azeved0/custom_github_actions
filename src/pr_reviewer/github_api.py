@@ -258,6 +258,37 @@ def _sync_summary(settings, event: PullRequestEvent, findings: list, unanchored:
         _post(settings, f"{base}/{event.number}/comments", {"body": body})
 
 
+def _commentable_map(settings, event: PullRequestEvent) -> "dict[str, set[int]]":
+    """Per-file set of new-file lines the Reviews API will accept an inline comment on."""
+    return {f.path: _commentable_lines(f.patch) for f in fetch_changed_files(settings, event)}
+
+
+def _inline_body(f) -> str:
+    emoji = _SEVERITY_EMOJI.get(f.severity, "")
+    return f"{emoji} **{f.severity}** — {f.message}\n\n{_INLINE_MARKER}"
+
+
+def _delete_stale_inline(settings, event: PullRequestEvent) -> None:
+    """Remove our previous run's inline comments (found by marker) so re-pushes replace them."""
+    base = f"{_API_ROOT}/repos/{event.owner}/{event.repo}/pulls"
+    for c in _paginate(settings, f"{base}/{event.number}/comments"):
+        if _INLINE_MARKER in (c.get("body") or ""):
+            _delete(settings, f"{base}/comments/{c['id']}")
+
+
+def _sync_inline(settings, event: PullRequestEvent, anchored: list) -> None:
+    _delete_stale_inline(settings, event)
+    if not anchored:
+        return
+    comments = [
+        {"path": f.path, "line": f.line, "side": "RIGHT", "body": _inline_body(f)}
+        for f in anchored
+    ]
+    url = f"{_API_ROOT}/repos/{event.owner}/{event.repo}/pulls/{event.number}/reviews"
+    # COMMENT requires a body; the invisible marker keeps the review summary blank in the UI.
+    _post(settings, url, {"event": "COMMENT", "body": _INLINE_MARKER, "comments": comments})
+
+
 def post_review(settings, event: PullRequestEvent, findings: list) -> None:
     """Post a summary + inline comments via the Reviews API, updating on re-push. (Phase 4)"""
     # TODO(phase-4): post via the Reviews API with a stable marker so re-pushes update

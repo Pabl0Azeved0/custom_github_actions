@@ -152,3 +152,51 @@ def test_sync_summary_patches_when_present(monkeypatch):
     gh._sync_summary(Settings(), PullRequestEvent("o", "r", 7), [], [])
     assert "post" not in calls
     assert calls["patch"].endswith("/issues/comments/42")
+
+
+def test_commentable_map(monkeypatch):
+    monkeypatch.setattr(
+        gh, "fetch_changed_files", lambda s, e: [ChangedFile("a.py", "modified", "@@ -1 +1 @@\n+x")]
+    )
+    m = gh._commentable_map(Settings(), PullRequestEvent("o", "r", 1))
+    assert m == {"a.py": {1}}
+
+
+def test_delete_stale_inline(monkeypatch):
+    deleted = []
+    monkeypatch.setattr(
+        gh,
+        "_paginate",
+        lambda s, url: [
+            {"id": 1, "body": "mine " + gh._INLINE_MARKER},
+            {"id": 2, "body": "a human comment"},
+        ],
+    )
+    monkeypatch.setattr(gh, "_delete", lambda s, url: deleted.append(url))
+    gh._delete_stale_inline(Settings(), PullRequestEvent("o", "r", 3))
+    assert len(deleted) == 1
+    assert deleted[0].endswith("/pulls/comments/1")
+
+
+def test_sync_inline_posts_review(monkeypatch):
+    posted = {}
+    monkeypatch.setattr(gh, "_delete_stale_inline", lambda s, e: None)
+    monkeypatch.setattr(gh, "_post", lambda s, url, payload: posted.update(url=url, payload=payload))
+    gh._sync_inline(Settings(), PullRequestEvent("o", "r", 3), [Finding("a.py", 5, "high", "bug")])
+    assert posted["url"].endswith("/pulls/3/reviews")
+    assert posted["payload"]["event"] == "COMMENT"
+    assert posted["payload"]["comments"][0] == {
+        "path": "a.py",
+        "line": 5,
+        "side": "RIGHT",
+        "body": posted["payload"]["comments"][0]["body"],
+    }
+    assert gh._INLINE_MARKER in posted["payload"]["comments"][0]["body"]
+
+
+def test_sync_inline_skips_post_when_empty(monkeypatch):
+    monkeypatch.setattr(gh, "_delete_stale_inline", lambda s, e: None)
+    monkeypatch.setattr(
+        gh, "_post", lambda *a, **k: (_ for _ in ()).throw(AssertionError("should not post"))
+    )
+    gh._sync_inline(Settings(), PullRequestEvent("o", "r", 3), [])
