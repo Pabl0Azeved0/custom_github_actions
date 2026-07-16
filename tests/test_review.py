@@ -16,6 +16,16 @@ def test_build_prompt_contains_key_pieces():
     assert "7" in prompt
 
 
+def test_build_prompt_strictness_aliases():
+    from pr_reviewer.review import _LENIENT, _STRICT
+
+    s = Settings()
+    s.strictness = "high"
+    assert _STRICT in review_mod.build_prompt(s, SAMPLE_DIFF)
+    s.strictness = "low"
+    assert _LENIENT in review_mod.build_prompt(s, SAMPLE_DIFF)
+
+
 def test_parse_findings_two_valid_items():
     raw = json.dumps(
         [

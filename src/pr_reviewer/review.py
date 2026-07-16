@@ -9,10 +9,16 @@ from pr_reviewer.llm.provider import get_provider
 
 logger = logging.getLogger("pr-reviewer")
 
+_LENIENT = "Only flag issues you are highly confident are real problems; when in doubt, say nothing."
+_BALANCED = "Flag issues you are reasonably confident are real problems."
+_STRICT = "Flag anything that could plausibly be a bug, security issue, or obvious simplification, even if you are only moderately confident."
+
 _STRICTNESS_GUIDANCE = {
-    "lenient": "Only flag issues you are highly confident are real problems; when in doubt, say nothing.",
-    "balanced": "Flag issues you are reasonably confident are real problems.",
-    "strict": "Flag anything that could plausibly be a bug, security issue, or obvious simplification, even if you are only moderately confident.",
+    "lenient": _LENIENT,
+    "low": _LENIENT,
+    "balanced": _BALANCED,
+    "strict": _STRICT,
+    "high": _STRICT,
 }
 
 
