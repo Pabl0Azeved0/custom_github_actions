@@ -1,4 +1,4 @@
-from pr_reviewer import github_api as gh
+import pr_reviewer.github.comments as gh
 from pr_reviewer.config import Settings
 from pr_reviewer.models import ChangedFile, Finding, PullRequestEvent
 
