@@ -224,7 +224,7 @@ def _finding_line(f) -> str:
     return f"- {emoji} **{f.severity}** {where} — {f.message}"
 
 
-def _summary_body(findings: list, unanchored: list) -> str:
+def _summary_body(findings: list, unanchored: list, fail_on_findings: bool = False) -> str:
     """Build the summary comment. Anchored findings show inline; unanchored list here."""
     lines = [_SUMMARY_MARKER, "## 🤖 AI code review", ""]
     if not findings:
@@ -235,7 +235,10 @@ def _summary_body(findings: list, unanchored: list) -> str:
         if unanchored:
             lines += ["", "Not tied to a specific diff line:", ""]
             lines += [_finding_line(f) for f in unanchored]
-    lines += ["", "_Report-only — this review never fails your build._"]
+    if fail_on_findings:
+        lines += ["", "_This review can fail the build when findings are present (fail-on-findings)._"]
+    else:
+        lines += ["", "_Report-only — this review never fails your build._"]
     return "\n".join(lines)
 
 
@@ -249,7 +252,7 @@ def _find_comment(settings, event: PullRequestEvent, marker: str) -> "int | None
 
 
 def _sync_summary(settings, event: PullRequestEvent, findings: list, unanchored: list) -> None:
-    body = _summary_body(findings, unanchored)
+    body = _summary_body(findings, unanchored, settings.fail_on_findings)
     existing = _find_comment(settings, event, _SUMMARY_MARKER)
     base = f"{_API_ROOT}/repos/{event.owner}/{event.repo}/issues"
     if existing is not None:

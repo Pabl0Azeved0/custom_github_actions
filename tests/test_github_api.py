@@ -131,6 +131,12 @@ def test_summary_body_lists_unanchored():
     assert "boom" in body
 
 
+def test_summary_body_fail_on_findings_footer():
+    body = gh._summary_body([], [], True)
+    assert "can fail the build" in body
+    assert "never fails your build" not in body
+
+
 def test_sync_summary_posts_when_absent(monkeypatch):
     calls = {}
     monkeypatch.setattr(gh, "_paginate", lambda s, url: [])
