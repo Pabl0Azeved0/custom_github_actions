@@ -12,6 +12,8 @@ from dataclasses import dataclass
 
 import requests
 
+from pr_reviewer.review import SEVERITY_EMOJI
+
 log = logging.getLogger("pr-reviewer")
 
 _API_ROOT = "https://api.github.com"
@@ -20,8 +22,6 @@ _API_ROOT = "https://api.github.com"
 # instead of piling up duplicates. They render as nothing in the GitHub UI.
 _SUMMARY_MARKER = "<!-- pr-reviewer:summary -->"
 _INLINE_MARKER = "<!-- pr-reviewer:inline -->"
-
-_SEVERITY_EMOJI = {"high": "🔴", "medium": "🟠", "low": "🟡"}
 
 
 @dataclass
@@ -223,7 +223,7 @@ def _split_findings(findings: list, commentable: "dict[str, set[int]]") -> tuple
 
 
 def _finding_line(f) -> str:
-    emoji = _SEVERITY_EMOJI.get(f.severity, "")
+    emoji = SEVERITY_EMOJI.get(f.severity, "")
     where = f"`{f.path}:{f.line}`" if f.line else f"`{f.path}`"
     return f"- {emoji} **{f.severity}** {where} — {f.message}"
 
@@ -273,7 +273,7 @@ def _commentable_map(settings, event: PullRequestEvent, files=None) -> "dict[str
 
 
 def _inline_body(f) -> str:
-    emoji = _SEVERITY_EMOJI.get(f.severity, "")
+    emoji = SEVERITY_EMOJI.get(f.severity, "")
     return f"{emoji} **{f.severity}** — {f.message}\n\n{_INLINE_MARKER}"
 
 

@@ -10,9 +10,9 @@ import logging
 
 import requests
 
-log = logging.getLogger("pr-reviewer")
+from pr_reviewer.review import SEVERITY_EMOJI
 
-_SEVERITY_EMOJI = {"high": "🔴", "medium": "🟠", "low": "🟡"}
+log = logging.getLogger("pr-reviewer")
 
 
 def _summary_text(event, findings: list) -> str:
@@ -23,7 +23,7 @@ def _summary_text(event, findings: list) -> str:
     for f in findings:
         counts[f.severity] = counts.get(f.severity, 0) + 1
     breakdown = ", ".join(
-        f"{_SEVERITY_EMOJI.get(sev, '')} {counts[sev]} {sev}"
+        f"{SEVERITY_EMOJI.get(sev, '')} {counts[sev]} {sev}"
         for sev in ("high", "medium", "low")
         if counts.get(sev)
     )
