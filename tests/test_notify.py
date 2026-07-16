@@ -1,7 +1,6 @@
 from pr_reviewer import notify
 from pr_reviewer.config import Settings
-from pr_reviewer.github_api import PullRequestEvent
-from pr_reviewer.review import Finding
+from pr_reviewer.models import Finding, PullRequestEvent
 
 
 class _FakeResp:

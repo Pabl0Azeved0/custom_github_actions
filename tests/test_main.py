@@ -1,6 +1,6 @@
 from pr_reviewer import main as main_mod
 from pr_reviewer.config import Settings
-from pr_reviewer.github_api import PullRequestEvent
+from pr_reviewer.models import PullRequestEvent
 
 
 def test_run_no_event_returns_zero(monkeypatch):

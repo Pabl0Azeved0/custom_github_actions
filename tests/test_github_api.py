@@ -1,7 +1,6 @@
 from pr_reviewer import github_api as gh
 from pr_reviewer.config import Settings
-from pr_reviewer.github_api import ChangedFile, PullRequestEvent
-from pr_reviewer.review import Finding
+from pr_reviewer.models import ChangedFile, Finding, PullRequestEvent
 
 
 def test_is_excluded_lock_and_dist():

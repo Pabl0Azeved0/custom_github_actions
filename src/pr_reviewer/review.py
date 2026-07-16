@@ -3,13 +3,11 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass
 
 from pr_reviewer.llm.provider import get_provider
+from pr_reviewer.models import Finding
 
 log = logging.getLogger("pr-reviewer")
-
-SEVERITY_EMOJI = {"high": "🔴", "medium": "🟠", "low": "🟡"}
 
 _LENIENT = "Only flag issues you are highly confident are real problems; when in doubt, say nothing."
 _BALANCED = "Flag issues you are reasonably confident are real problems."
@@ -22,14 +20,6 @@ _STRICTNESS_GUIDANCE = {
     "strict": _STRICT,
     "high": _STRICT,
 }
-
-
-@dataclass
-class Finding:
-    path: str
-    line: int
-    severity: str
-    message: str
 
 
 def build_prompt(settings, diff: str) -> str:

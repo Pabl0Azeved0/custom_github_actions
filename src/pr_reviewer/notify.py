@@ -10,7 +10,7 @@ import logging
 
 import requests
 
-from pr_reviewer.review import SEVERITY_EMOJI
+from pr_reviewer.models import SEVERITY_EMOJI
 
 log = logging.getLogger("pr-reviewer")
 

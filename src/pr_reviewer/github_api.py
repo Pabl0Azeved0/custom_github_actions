@@ -8,12 +8,11 @@ import json
 import logging
 import os
 import re
-from dataclasses import dataclass
 from functools import lru_cache
 
 import requests
 
-from pr_reviewer.review import SEVERITY_EMOJI
+from pr_reviewer.models import ChangedFile, PullRequestEvent, SEVERITY_EMOJI
 
 log = logging.getLogger("pr-reviewer")
 
@@ -23,20 +22,6 @@ _API_ROOT = "https://api.github.com"
 # instead of piling up duplicates. They render as nothing in the GitHub UI.
 _SUMMARY_MARKER = "<!-- pr-reviewer:summary -->"
 _INLINE_MARKER = "<!-- pr-reviewer:inline -->"
-
-
-@dataclass
-class PullRequestEvent:
-    owner: str
-    repo: str
-    number: int
-
-
-@dataclass
-class ChangedFile:
-    path: str
-    status: str
-    patch: str  # unified diff hunk for this file ("" when GitHub omits it, e.g. binaries)
 
 
 def load_event() -> "PullRequestEvent | None":
