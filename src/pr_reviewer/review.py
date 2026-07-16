@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from pr_reviewer.llm.provider import get_provider
 
-logger = logging.getLogger("pr-reviewer")
+log = logging.getLogger("pr-reviewer")
 
 SEVERITY_EMOJI = {"high": "🔴", "medium": "🟠", "low": "🟡"}
 
@@ -68,7 +68,7 @@ def parse_findings(raw: str) -> "list[Finding]":
     try:
         data = json.loads(text)
     except (ValueError, TypeError):
-        logger.warning("failed to parse LLM findings as JSON")
+        log.warning("failed to parse LLM findings as JSON")
         return []
 
     if isinstance(data, dict):
