@@ -10,7 +10,8 @@ import logging
 import sys
 
 from pr_reviewer.config import get_settings
-from pr_reviewer.github_api import fetch_changed_files, load_event, post_review, render_diff
+from pr_reviewer.github.diff import fetch_changed_files, render_diff
+from pr_reviewer.github_api import load_event, post_review
 from pr_reviewer.notify import notify_slack
 from pr_reviewer.review import review_diff
 
