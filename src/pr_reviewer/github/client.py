@@ -1,0 +1,53 @@
+from __future__ import annotations
+
+import requests
+
+_API_ROOT = "https://api.github.com"
+
+
+def _headers(settings) -> dict:
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+    if settings.github_token:
+        headers["Authorization"] = f"Bearer {settings.github_token}"
+    return headers
+
+
+def _get(settings, url: str, params: "dict | None" = None) -> requests.Response:
+    resp = requests.get(url, headers=_headers(settings), params=params, timeout=60)
+    resp.raise_for_status()
+    return resp
+
+
+def _post(settings, url: str, payload: dict) -> requests.Response:
+    resp = requests.post(url, headers=_headers(settings), json=payload, timeout=60)
+    resp.raise_for_status()
+    return resp
+
+
+def _patch(settings, url: str, payload: dict) -> requests.Response:
+    resp = requests.patch(url, headers=_headers(settings), json=payload, timeout=60)
+    resp.raise_for_status()
+    return resp
+
+
+def _delete(settings, url: str) -> requests.Response:
+    resp = requests.delete(url, headers=_headers(settings), timeout=60)
+    resp.raise_for_status()
+    return resp
+
+
+def _paginate(settings, url: str) -> "list[dict]":
+    items: list[dict] = []
+    page = 1
+    while True:
+        batch = _get(settings, url, params={"per_page": 100, "page": page}).json()
+        if not batch:
+            break
+        items.extend(batch)
+        if len(batch) < 100:
+            break
+        page += 1
+    return items

@@ -1,5 +1,6 @@
 from pr_reviewer import github_api as gh
 from pr_reviewer.config import Settings
+from pr_reviewer.github import client
 from pr_reviewer.models import ChangedFile, Finding, PullRequestEvent
 
 
@@ -42,7 +43,7 @@ def test_fetch_changed_files(monkeypatch):
             return _FakeResp([{"filename": "a.py", "status": "modified", "patch": "@@"}])
         return _FakeResp([])
 
-    monkeypatch.setattr(gh, "_get", fake_get)
+    monkeypatch.setattr(client, "_get", fake_get)
     files = gh.fetch_changed_files(Settings(), PullRequestEvent("o", "r", 1))
     assert len(files) == 1
     assert files[0].path == "a.py"

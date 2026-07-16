@@ -10,13 +10,10 @@ import os
 import re
 from functools import lru_cache
 
-import requests
-
+from pr_reviewer.github.client import _API_ROOT, _delete, _get, _headers, _paginate, _patch, _post
 from pr_reviewer.models import ChangedFile, PullRequestEvent, SEVERITY_EMOJI
 
 log = logging.getLogger("pr-reviewer")
-
-_API_ROOT = "https://api.github.com"
 
 # Hidden markers let us find our own comments on re-push and update them in place
 # instead of piling up duplicates. They render as nothing in the GitHub UI.
@@ -79,54 +76,6 @@ def _include(f: ChangedFile, exclude: list[str]) -> bool:
     if f.status == "removed":  # a pure deletion has nothing to review
         return False
     return not is_excluded(f.path, exclude)
-
-
-def _headers(settings) -> dict:
-    headers = {
-        "Accept": "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28",
-    }
-    if settings.github_token:
-        headers["Authorization"] = f"Bearer {settings.github_token}"
-    return headers
-
-
-def _get(settings, url: str, params: "dict | None" = None) -> requests.Response:
-    resp = requests.get(url, headers=_headers(settings), params=params, timeout=60)
-    resp.raise_for_status()
-    return resp
-
-
-def _post(settings, url: str, payload: dict) -> requests.Response:
-    resp = requests.post(url, headers=_headers(settings), json=payload, timeout=60)
-    resp.raise_for_status()
-    return resp
-
-
-def _patch(settings, url: str, payload: dict) -> requests.Response:
-    resp = requests.patch(url, headers=_headers(settings), json=payload, timeout=60)
-    resp.raise_for_status()
-    return resp
-
-
-def _delete(settings, url: str) -> requests.Response:
-    resp = requests.delete(url, headers=_headers(settings), timeout=60)
-    resp.raise_for_status()
-    return resp
-
-
-def _paginate(settings, url: str) -> "list[dict]":
-    items: list[dict] = []
-    page = 1
-    while True:
-        batch = _get(settings, url, params={"per_page": 100, "page": page}).json()
-        if not batch:
-            break
-        items.extend(batch)
-        if len(batch) < 100:
-            break
-        page += 1
-    return items
 
 
 def fetch_changed_files(settings, event: PullRequestEvent) -> "list[ChangedFile]":
