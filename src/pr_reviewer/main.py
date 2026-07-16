@@ -10,7 +10,7 @@ import logging
 import sys
 
 from pr_reviewer.config import get_settings
-from pr_reviewer.github_api import collect_diff, load_event, post_review
+from pr_reviewer.github_api import fetch_changed_files, load_event, post_review, render_diff
 from pr_reviewer.notify import notify_slack
 from pr_reviewer.review import review_diff
 
@@ -27,9 +27,10 @@ def run() -> int:
             log.info("no pull_request event found; nothing to review")
             return 0
         log.info("reviewing %s/%s#%s", event.owner, event.repo, event.number)
-        diff = collect_diff(settings, event)
+        files = fetch_changed_files(settings, event)
+        diff = render_diff(files, settings)
         findings = review_diff(settings, diff)
-        post_review(settings, event, findings)
+        post_review(settings, event, findings, files=files)
         notify_slack(settings, event, findings)
         log.info("review complete: %d finding(s)", len(findings))
     except Exception as exc:  # hard rule: never fail the build on our own error

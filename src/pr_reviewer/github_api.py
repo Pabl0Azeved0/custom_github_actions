@@ -166,9 +166,8 @@ def _apply_budget(diff: str, max_bytes: int) -> str:
     return truncated + "\n\n[... diff truncated to fit the review budget ...]"
 
 
-def collect_diff(settings, event: PullRequestEvent) -> str:
-    """Fetch the PR diff, drop excluded/binary/deleted files, and enforce the byte budget."""
-    files = fetch_changed_files(settings, event)
+def render_diff(files: "list[ChangedFile]", settings) -> str:
+    """Filter fetched files (excluded/binary/deleted) and enforce the byte budget."""
     included = [f for f in files if _include(f, settings.exclude)]
     diff = _render(included)
     budgeted = _apply_budget(diff, settings.max_diff_bytes)
@@ -181,6 +180,11 @@ def collect_diff(settings, event: PullRequestEvent) -> str:
         " (truncated)" if truncated else "",
     )
     return budgeted
+
+
+def collect_diff(settings, event: PullRequestEvent) -> str:
+    """Fetch the PR diff, drop excluded/binary/deleted files, and enforce the byte budget."""
+    return render_diff(fetch_changed_files(settings, event), settings)
 
 
 def _commentable_lines(patch: str) -> "set[int]":
@@ -261,9 +265,11 @@ def _sync_summary(settings, event: PullRequestEvent, findings: list, unanchored:
         _post(settings, f"{base}/{event.number}/comments", {"body": body})
 
 
-def _commentable_map(settings, event: PullRequestEvent) -> "dict[str, set[int]]":
+def _commentable_map(settings, event: PullRequestEvent, files=None) -> "dict[str, set[int]]":
     """Per-file set of new-file lines the Reviews API will accept an inline comment on."""
-    return {f.path: _commentable_lines(f.patch) for f in fetch_changed_files(settings, event)}
+    if files is None:
+        files = fetch_changed_files(settings, event)
+    return {f.path: _commentable_lines(f.patch) for f in files}
 
 
 def _inline_body(f) -> str:
@@ -292,14 +298,14 @@ def _sync_inline(settings, event: PullRequestEvent, anchored: list) -> None:
     _post(settings, url, {"event": "COMMENT", "body": _INLINE_MARKER, "comments": comments})
 
 
-def post_review(settings, event: PullRequestEvent, findings: list) -> None:
+def post_review(settings, event: PullRequestEvent, findings: list, files=None) -> None:
     """Post/update a summary comment and inline review comments for the findings.
 
     Idempotent across re-pushes: hidden markers identify our own comments, so the summary
     is edited in place and stale inline comments are replaced instead of duplicated.
     Findings on a diff line become inline comments; the rest are listed in the summary.
     """
-    commentable = _commentable_map(settings, event)
+    commentable = _commentable_map(settings, event, files)
     anchored, unanchored = _split_findings(findings, commentable)
     _sync_summary(settings, event, findings, unanchored)
     _sync_inline(settings, event, anchored)
