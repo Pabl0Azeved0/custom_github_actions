@@ -9,6 +9,7 @@ import logging
 import os
 import re
 from dataclasses import dataclass
+from functools import lru_cache
 
 import requests
 
@@ -54,6 +55,7 @@ def load_event() -> "PullRequestEvent | None":
     return PullRequestEvent(owner=owner, repo=name, number=pr.get("number"))
 
 
+@lru_cache(maxsize=None)
 def _glob_to_regex(pattern: str) -> str:
     """Translate a gitignore-style glob into a regex anchored to the whole path.
 
