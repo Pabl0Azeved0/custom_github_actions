@@ -1,6 +1,7 @@
-"""GitHub API access: read the PR diff (Phase 2) and post review comments (Phase 4).
+"""Post review findings to a PR: one summary comment plus inline comments via the Reviews API.
 
-Scaffold stubs — the real diff collection and Reviews-API posting land in later phases.
+Idempotent across re-pushes — hidden markers identify our own comments so the summary is
+edited in place and stale inline comments are replaced rather than duplicated.
 """
 from __future__ import annotations
 
