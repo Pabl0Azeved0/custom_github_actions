@@ -11,6 +11,7 @@ import sys
 
 from pr_reviewer.config import get_settings
 from pr_reviewer.github_api import collect_diff, load_event, post_review
+from pr_reviewer.notify import notify_slack
 from pr_reviewer.review import review_diff
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
@@ -29,6 +30,7 @@ def run() -> int:
         diff = collect_diff(settings, event)
         findings = review_diff(settings, diff)
         post_review(settings, event, findings)
+        notify_slack(settings, event, findings)
         log.info("review complete: %d finding(s)", len(findings))
     except Exception as exc:  # hard rule: never fail the build on our own error
         log.warning("pr-reviewer degraded, skipping review: %s", exc)
