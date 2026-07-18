@@ -96,6 +96,31 @@ def test_delete_stale_inline(monkeypatch):
     assert deleted[0].endswith("/pulls/comments/1")
 
 
+def test_find_comment_stops_at_first_page(monkeypatch):
+    # _paginate is lazy, so a marker on page 1 must not fetch the pages behind it.
+    import pr_reviewer.github.client as client
+
+    pages = []
+
+    class FakeResp:
+        def __init__(self, items):
+            self._items = items
+
+        def json(self):
+            return self._items
+
+    def fake_get(settings, url, params=None):
+        page = params["page"]
+        pages.append(page)
+        body = gh._SUMMARY_MARKER if page == 1 else "someone else"
+        return FakeResp([{"id": page * 100 + i, "body": body} for i in range(100)])
+
+    monkeypatch.setattr(client, "_get", fake_get)
+    found = gh._find_comment(Settings(), PullRequestEvent("o", "r", 1), gh._SUMMARY_MARKER)
+    assert found == 100
+    assert pages == [1]
+
+
 def test_sync_inline_posts_review(monkeypatch):
     posted = {}
     monkeypatch.setattr(gh, "_delete_stale_inline", lambda s, e: None)

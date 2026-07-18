@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
+
 import requests
 
 _API_ROOT = "https://api.github.com"
@@ -41,15 +43,13 @@ def _delete(settings, url: str) -> requests.Response:
     return resp
 
 
-def _paginate(settings, url: str) -> "list[dict]":
-    items: list[dict] = []
+def _paginate(settings, url: str) -> "Iterator[dict]":
     page = 1
     while True:
         batch = _get(settings, url, params={"per_page": 100, "page": page}).json()
         if not batch:
-            break
-        items.extend(batch)
+            return
+        yield from batch
         if len(batch) < 100:
-            break
+            return
         page += 1
-    return items

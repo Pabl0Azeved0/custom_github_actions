@@ -113,9 +113,13 @@ def _inline_body(f) -> str:
 def _delete_stale_inline(settings, event: PullRequestEvent) -> None:
     """Remove our previous run's inline comments (found by marker) so re-pushes replace them."""
     base = f"{_API_ROOT}/repos/{event.owner}/{event.repo}/pulls"
-    for c in _paginate(settings, f"{base}/{event.number}/comments"):
-        if _INLINE_MARKER in (c.get("body") or ""):
-            _delete(settings, f"{base}/comments/{c['id']}")
+    stale = [
+        c["id"]
+        for c in _paginate(settings, f"{base}/{event.number}/comments")
+        if _INLINE_MARKER in (c.get("body") or "")
+    ]
+    for cid in stale:
+        _delete(settings, f"{base}/comments/{cid}")
 
 
 def _sync_inline(settings, event: PullRequestEvent, anchored: list) -> None:
