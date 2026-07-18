@@ -4,6 +4,8 @@ import requests
 
 _API_ROOT = "https://api.github.com"
 
+_session = requests.Session()  # reused across calls to avoid reconnecting per request
+
 
 def _headers(settings) -> dict:
     headers = {
@@ -16,25 +18,25 @@ def _headers(settings) -> dict:
 
 
 def _get(settings, url: str, params: "dict | None" = None) -> requests.Response:
-    resp = requests.get(url, headers=_headers(settings), params=params, timeout=60)
+    resp = _session.get(url, headers=_headers(settings), params=params, timeout=60)
     resp.raise_for_status()
     return resp
 
 
 def _post(settings, url: str, payload: dict) -> requests.Response:
-    resp = requests.post(url, headers=_headers(settings), json=payload, timeout=60)
+    resp = _session.post(url, headers=_headers(settings), json=payload, timeout=60)
     resp.raise_for_status()
     return resp
 
 
 def _patch(settings, url: str, payload: dict) -> requests.Response:
-    resp = requests.patch(url, headers=_headers(settings), json=payload, timeout=60)
+    resp = _session.patch(url, headers=_headers(settings), json=payload, timeout=60)
     resp.raise_for_status()
     return resp
 
 
 def _delete(settings, url: str) -> requests.Response:
-    resp = requests.delete(url, headers=_headers(settings), timeout=60)
+    resp = _session.delete(url, headers=_headers(settings), timeout=60)
     resp.raise_for_status()
     return resp
 
