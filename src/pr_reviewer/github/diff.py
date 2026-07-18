@@ -63,8 +63,17 @@ def fetch_changed_files(settings, event: PullRequestEvent) -> "list[ChangedFile]
     ]
 
 
-def _render(files: "list[ChangedFile]") -> str:
-    return "\n\n".join(f"--- {f.path} ({f.status})\n{f.patch}" for f in files)
+def _render(files: "list[ChangedFile]", max_bytes: "int | None" = None) -> str:
+    chunks: list[str] = []
+    size = 0
+    for f in files:
+        chunks.append(f"--- {f.path} ({f.status})\n{f.patch}")
+        if max_bytes is None:
+            continue
+        size += len(chunks[-1].encode("utf-8")) + (2 if len(chunks) > 1 else 0)
+        if size > max_bytes:
+            break
+    return "\n\n".join(chunks)
 
 
 def _apply_budget(diff: str, max_bytes: int) -> str:
@@ -78,7 +87,7 @@ def _apply_budget(diff: str, max_bytes: int) -> str:
 def render_diff(files: "list[ChangedFile]", settings) -> str:
     """Filter fetched files (excluded/binary/deleted) and enforce the byte budget."""
     included = [f for f in files if _include(f, settings.exclude)]
-    diff = _render(included)
+    diff = _render(included, settings.max_diff_bytes)
     budgeted = _apply_budget(diff, settings.max_diff_bytes)
     truncated = len(budgeted) != len(diff)
     log.info(
