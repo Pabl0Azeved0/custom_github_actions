@@ -11,7 +11,7 @@ log = logging.getLogger("pr-reviewer")
 
 
 @lru_cache(maxsize=None)
-def _glob_to_regex(pattern: str) -> str:
+def _glob_to_regex(pattern: str) -> "re.Pattern[str]":
     """Translate a gitignore-style glob into a regex anchored to the whole path.
 
     `**/` matches zero or more leading directories, `**` matches across separators,
@@ -35,11 +35,11 @@ def _glob_to_regex(pattern: str) -> str:
         else:
             out.append(re.escape(pattern[i]))
             i += 1
-    return "(?s:" + "".join(out) + r")\Z"
+    return re.compile("(?s:" + "".join(out) + r")\Z")
 
 
 def is_excluded(path: str, patterns: list[str]) -> bool:
-    return any(re.match(_glob_to_regex(pat), path) for pat in patterns)
+    return any(_glob_to_regex(pat).match(path) for pat in patterns)
 
 
 def _include(f: ChangedFile, exclude: list[str]) -> bool:
