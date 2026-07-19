@@ -6,23 +6,35 @@ from functools import lru_cache
 
 from dotenv import load_dotenv
 
-# Load a local .env if present (no-op in the Action, where inputs arrive as INPUT_* env vars).
-load_dotenv()
+
+def _local_run() -> bool:
+    """True only for explicit local runs. Never true in the Action.
+
+    A Docker action's working directory is the checked-out PR, so reading a .env (or bare
+    env names) there would let a PR author override our inputs. Opt in explicitly instead.
+    """
+    return os.getenv("PR_REVIEWER_LOCAL") == "1"
+
+
+if _local_run():
+    load_dotenv()
 
 
 def _input(name: str, default: str = "") -> str:
     """Read a GitHub Action input.
 
     GitHub passes `with:` inputs as `INPUT_<UPPER-NAME>` env vars (hyphens kept). For
-    local runs we also accept the bare, underscored name (e.g. LLM_PROVIDER) as a fallback.
+    explicit local runs (PR_REVIEWER_LOCAL=1) we also accept the bare, underscored name
+    (e.g. LLM_PROVIDER) as a fallback.
     """
     upper = name.upper()
     env_input = os.getenv(f"INPUT_{upper}")
     if env_input:
         return env_input
-    bare = os.getenv(upper.replace("-", "_"))
-    if bare:
-        return bare
+    if _local_run():
+        bare = os.getenv(upper.replace("-", "_"))
+        if bare:
+            return bare
     return default
 
 

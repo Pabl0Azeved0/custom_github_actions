@@ -7,12 +7,21 @@ the user's build or interrupt the review (hard rule 1).
 from __future__ import annotations
 
 import logging
+from urllib.parse import urlparse
 
 import requests
 
 from pr_reviewer.models import SEVERITY_EMOJI
 
 log = logging.getLogger("pr-reviewer")
+
+_WEBHOOK_HOST = "hooks.slack.com"
+
+
+def _is_slack_webhook(url: str) -> bool:
+    """Slack incoming webhooks are always https://hooks.slack.com/... — reject anything else."""
+    parsed = urlparse(url)
+    return parsed.scheme == "https" and parsed.hostname == _WEBHOOK_HOST
 
 
 def _summary_text(event, findings: list) -> str:
@@ -39,6 +48,9 @@ def notify_slack(settings, event, findings: list) -> None:
     """
     webhook = settings.slack_webhook
     if not webhook:
+        return
+    if not _is_slack_webhook(webhook):
+        log.warning("ignoring slack-webhook: not an https://hooks.slack.com URL")
         return
     try:
         resp = requests.post(

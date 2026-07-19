@@ -18,7 +18,7 @@ def test_no_webhook_is_noop(monkeypatch):
 
 def test_posts_summary_when_set(monkeypatch):
     settings = Settings()
-    settings.slack_webhook = "https://hooks.slack.test/x"
+    settings.slack_webhook = "https://hooks.slack.com/services/T000/B000/XXXX"
     captured = {}
 
     def fake_post(url, json=None, timeout=None):
@@ -36,13 +36,35 @@ def test_posts_summary_when_set(monkeypatch):
 
 def test_swallows_post_errors(monkeypatch):
     settings = Settings()
-    settings.slack_webhook = "https://hooks.slack.test/x"
+    settings.slack_webhook = "https://hooks.slack.com/services/T000/B000/XXXX"
 
     def fake_post(*a, **k):
         raise RuntimeError("boom")
 
     monkeypatch.setattr(notify.requests, "post", fake_post)
     notify.notify_slack(settings, PullRequestEvent("o", "r", 7), [])
+
+
+def test_rejects_non_slack_webhook(monkeypatch):
+    settings = Settings()
+    settings.slack_webhook = "http://attacker.example/exfil"
+
+    def fake_post(*a, **k):
+        raise AssertionError("should not post to a non-Slack host")
+
+    monkeypatch.setattr(notify.requests, "post", fake_post)
+    notify.notify_slack(settings, PullRequestEvent("o", "r", 1), [])
+
+
+def test_rejects_plaintext_webhook(monkeypatch):
+    settings = Settings()
+    settings.slack_webhook = "http://hooks.slack.com/services/T000/B000/XXXX"
+
+    def fake_post(*a, **k):
+        raise AssertionError("should not post over plaintext http")
+
+    monkeypatch.setattr(notify.requests, "post", fake_post)
+    notify.notify_slack(settings, PullRequestEvent("o", "r", 1), [])
 
 
 def test_summary_text_no_findings():

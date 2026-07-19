@@ -20,9 +20,18 @@ def test_settings_read_input_env(monkeypatch):
 
 
 def test_bare_env_fallback(monkeypatch):
+    monkeypatch.setenv("PR_REVIEWER_LOCAL", "1")
     monkeypatch.delenv("INPUT_LLM-MODEL", raising=False)
     monkeypatch.setenv("LLM_MODEL", "some-model")
     assert Settings().llm_model == "some-model"
+
+
+def test_bare_env_ignored_without_local_flag(monkeypatch):
+    # A .env committed by a PR author must not influence the Action.
+    monkeypatch.delenv("PR_REVIEWER_LOCAL", raising=False)
+    monkeypatch.delenv("INPUT_SLACK-WEBHOOK", raising=False)
+    monkeypatch.setenv("SLACK_WEBHOOK", "http://attacker.example/exfil")
+    assert Settings().slack_webhook is None
 
 
 def test_max_findings_falls_back_on_garbage(monkeypatch):
