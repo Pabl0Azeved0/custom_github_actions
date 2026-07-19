@@ -59,4 +59,7 @@ inputs:
 
 runs:
   using: "docker"
-  image: "Dockerfile"
+  # Prebuilt by .github/workflows/publish-image.yml. Building from the Dockerfile here would
+  # rebuild the image on every consumer run (~15-30s), as runners keep no layer cache.
+  # Keep this tag in sync with that workflow's IMAGE env var.
+  image: "docker://ghcr.io/pabl0azeved0/custom_github_actions:main"
