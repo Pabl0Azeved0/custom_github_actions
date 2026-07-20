@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 import re
 
-from pr_reviewer.github.client import _API_ROOT, _delete, _paginate, _patch, _post
+from pr_reviewer.github.client import _API_ROOT, _delete, _get, _paginate, _patch, _post
 from pr_reviewer.github.diff import fetch_changed_files
 from pr_reviewer.models import PullRequestEvent, SEVERITY_EMOJI
 
@@ -18,6 +18,22 @@ log = logging.getLogger("pr-reviewer")
 # instead of piling up duplicates. They render as nothing in the GitHub UI.
 _SUMMARY_MARKER = "<!-- pr-reviewer:summary -->"
 _INLINE_MARKER = "<!-- pr-reviewer:inline -->"
+
+_DEFAULT_BOT_LOGIN = "github-actions[bot]"
+
+
+def _our_login(settings) -> str:
+    """The login our token posts as. GITHUB_TOKEN can't GET /user, and posts as the bot."""
+    try:
+        return _get(settings, f"{_API_ROOT}/user").json().get("login") or _DEFAULT_BOT_LOGIN
+    except Exception:
+        return _DEFAULT_BOT_LOGIN
+
+
+def _is_ours(comment: dict, marker: str, login: str) -> bool:
+    """A comment is ours only if it carries our marker AND was posted by our login —
+    otherwise any PR participant could plant a comment with the marker and hijack it."""
+    return marker in (comment.get("body") or "") and (comment.get("user") or {}).get("login") == login
 
 
 def _commentable_lines(patch: str) -> "set[int]":
@@ -79,18 +95,20 @@ def _summary_body(findings: list, unanchored: list, fail_on_findings: bool = Fal
     return "\n".join(lines)
 
 
-def _find_comment(settings, event: PullRequestEvent, marker: str) -> "int | None":
-    """Return the id of our previous summary comment (by hidden marker), if any."""
+def _find_comment(settings, event: PullRequestEvent, marker: str, login: str) -> "int | None":
+    """Return the id of our previous summary comment (by hidden marker and author), if any."""
     url = f"{_API_ROOT}/repos/{event.owner}/{event.repo}/issues/{event.number}/comments"
     for c in _paginate(settings, url):
-        if marker in (c.get("body") or ""):
+        if _is_ours(c, marker, login):
             return c.get("id")
     return None
 
 
-def _sync_summary(settings, event: PullRequestEvent, findings: list, unanchored: list) -> None:
+def _sync_summary(
+    settings, event: PullRequestEvent, findings: list, unanchored: list, login: str
+) -> None:
     body = _summary_body(findings, unanchored, settings.fail_on_findings)
-    existing = _find_comment(settings, event, _SUMMARY_MARKER)
+    existing = _find_comment(settings, event, _SUMMARY_MARKER, login)
     base = f"{_API_ROOT}/repos/{event.owner}/{event.repo}/issues"
     if existing is not None:
         _patch(settings, f"{base}/comments/{existing}", {"body": body})
@@ -110,20 +128,21 @@ def _inline_body(f) -> str:
     return f"{emoji} **{f.severity}** — {f.message}\n\n{_INLINE_MARKER}"
 
 
-def _delete_stale_inline(settings, event: PullRequestEvent) -> None:
-    """Remove our previous run's inline comments (found by marker) so re-pushes replace them."""
+def _delete_stale_inline(settings, event: PullRequestEvent, login: str) -> None:
+    """Remove our previous run's inline comments (found by marker and author) so re-pushes
+    replace them."""
     base = f"{_API_ROOT}/repos/{event.owner}/{event.repo}/pulls"
     stale = [
         c["id"]
         for c in _paginate(settings, f"{base}/{event.number}/comments")
-        if _INLINE_MARKER in (c.get("body") or "")
+        if _is_ours(c, _INLINE_MARKER, login)
     ]
     for cid in stale:
         _delete(settings, f"{base}/comments/{cid}")
 
 
-def _sync_inline(settings, event: PullRequestEvent, anchored: list) -> None:
-    _delete_stale_inline(settings, event)
+def _sync_inline(settings, event: PullRequestEvent, anchored: list, login: str) -> None:
+    _delete_stale_inline(settings, event, login)
     if not anchored:
         return
     comments = [
@@ -144,5 +163,6 @@ def post_review(settings, event: PullRequestEvent, findings: list, files=None) -
     """
     commentable = _commentable_map(settings, event, files)
     anchored, unanchored = _split_findings(findings, commentable)
-    _sync_summary(settings, event, findings, unanchored)
-    _sync_inline(settings, event, anchored)
+    login = _our_login(settings)
+    _sync_summary(settings, event, findings, unanchored, login)
+    _sync_inline(settings, event, anchored, login)

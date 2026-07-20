@@ -54,7 +54,7 @@ def test_sync_summary_posts_when_absent(monkeypatch):
     monkeypatch.setattr(gh, "_paginate", lambda s, url: [])
     monkeypatch.setattr(gh, "_post", lambda s, url, payload: calls.update(post=(url, payload)))
     monkeypatch.setattr(gh, "_patch", lambda s, url, payload: calls.update(patch=url))
-    gh._sync_summary(Settings(), PullRequestEvent("o", "r", 7), [], [])
+    gh._sync_summary(Settings(), PullRequestEvent("o", "r", 7), [], [], "github-actions[bot]")
     assert "patch" not in calls
     assert "/issues/7/comments" in calls["post"][0]
     assert gh._SUMMARY_MARKER in calls["post"][1]["body"]
@@ -63,11 +63,19 @@ def test_sync_summary_posts_when_absent(monkeypatch):
 def test_sync_summary_patches_when_present(monkeypatch):
     calls = {}
     monkeypatch.setattr(
-        gh, "_paginate", lambda s, url: [{"id": 42, "body": gh._SUMMARY_MARKER + " old"}]
+        gh,
+        "_paginate",
+        lambda s, url: [
+            {
+                "id": 42,
+                "body": gh._SUMMARY_MARKER + " old",
+                "user": {"login": "github-actions[bot]"},
+            }
+        ],
     )
     monkeypatch.setattr(gh, "_post", lambda s, url, payload: calls.update(post=url))
     monkeypatch.setattr(gh, "_patch", lambda s, url, payload: calls.update(patch=url))
-    gh._sync_summary(Settings(), PullRequestEvent("o", "r", 7), [], [])
+    gh._sync_summary(Settings(), PullRequestEvent("o", "r", 7), [], [], "github-actions[bot]")
     assert "post" not in calls
     assert calls["patch"].endswith("/issues/comments/42")
 
@@ -86,14 +94,29 @@ def test_delete_stale_inline(monkeypatch):
         gh,
         "_paginate",
         lambda s, url: [
-            {"id": 1, "body": "mine " + gh._INLINE_MARKER},
-            {"id": 2, "body": "a human comment"},
+            {"id": 1, "body": "mine " + gh._INLINE_MARKER, "user": {"login": "github-actions[bot]"}},
+            {"id": 2, "body": "a human comment", "user": {"login": "someone"}},
         ],
     )
     monkeypatch.setattr(gh, "_delete", lambda s, url: deleted.append(url))
-    gh._delete_stale_inline(Settings(), PullRequestEvent("o", "r", 3))
+    gh._delete_stale_inline(Settings(), PullRequestEvent("o", "r", 3), "github-actions[bot]")
     assert len(deleted) == 1
     assert deleted[0].endswith("/pulls/comments/1")
+
+
+def test_delete_stale_inline_ignores_foreign_author(monkeypatch):
+    # An attacker-authored comment carrying our marker must not be treated as ours.
+    deleted = []
+    monkeypatch.setattr(
+        gh,
+        "_paginate",
+        lambda s, url: [
+            {"id": 1, "body": "spoofed " + gh._INLINE_MARKER, "user": {"login": "attacker"}},
+        ],
+    )
+    monkeypatch.setattr(gh, "_delete", lambda s, url: deleted.append(url))
+    gh._delete_stale_inline(Settings(), PullRequestEvent("o", "r", 3), "github-actions[bot]")
+    assert deleted == []
 
 
 def test_find_comment_stops_at_first_page(monkeypatch):
@@ -113,19 +136,44 @@ def test_find_comment_stops_at_first_page(monkeypatch):
         page = params["page"]
         pages.append(page)
         body = gh._SUMMARY_MARKER if page == 1 else "someone else"
-        return FakeResp([{"id": page * 100 + i, "body": body} for i in range(100)])
+        return FakeResp(
+            [
+                {"id": page * 100 + i, "body": body, "user": {"login": "github-actions[bot]"}}
+                for i in range(100)
+            ]
+        )
 
     monkeypatch.setattr(client, "_get", fake_get)
-    found = gh._find_comment(Settings(), PullRequestEvent("o", "r", 1), gh._SUMMARY_MARKER)
+    found = gh._find_comment(
+        Settings(), PullRequestEvent("o", "r", 1), gh._SUMMARY_MARKER, "github-actions[bot]"
+    )
     assert found == 100
     assert pages == [1]
 
 
+def test_find_comment_ignores_foreign_author_even_if_earlier(monkeypatch):
+    # An attacker comment with the marker, posted before ours, must not be mistaken for ours.
+    monkeypatch.setattr(
+        gh,
+        "_paginate",
+        lambda s, url: [
+            {"id": 1, "body": gh._SUMMARY_MARKER + " spoofed", "user": {"login": "attacker"}},
+            {"id": 2, "body": gh._SUMMARY_MARKER, "user": {"login": "github-actions[bot]"}},
+        ],
+    )
+    found = gh._find_comment(
+        Settings(), PullRequestEvent("o", "r", 1), gh._SUMMARY_MARKER, "github-actions[bot]"
+    )
+    assert found == 2
+
+
 def test_sync_inline_posts_review(monkeypatch):
     posted = {}
-    monkeypatch.setattr(gh, "_delete_stale_inline", lambda s, e: None)
+    monkeypatch.setattr(gh, "_delete_stale_inline", lambda s, e, login: None)
     monkeypatch.setattr(gh, "_post", lambda s, url, payload: posted.update(url=url, payload=payload))
-    gh._sync_inline(Settings(), PullRequestEvent("o", "r", 3), [Finding("a.py", 5, "high", "bug")])
+    gh._sync_inline(
+        Settings(), PullRequestEvent("o", "r", 3), [Finding("a.py", 5, "high", "bug")], "github-actions[bot]"
+    )
     assert posted["url"].endswith("/pulls/3/reviews")
     assert posted["payload"]["event"] == "COMMENT"
     assert posted["payload"]["comments"][0] == {
@@ -138,22 +186,23 @@ def test_sync_inline_posts_review(monkeypatch):
 
 
 def test_sync_inline_skips_post_when_empty(monkeypatch):
-    monkeypatch.setattr(gh, "_delete_stale_inline", lambda s, e: None)
+    monkeypatch.setattr(gh, "_delete_stale_inline", lambda s, e, login: None)
     monkeypatch.setattr(
         gh, "_post", lambda *a, **k: (_ for _ in ()).throw(AssertionError("should not post"))
     )
-    gh._sync_inline(Settings(), PullRequestEvent("o", "r", 3), [])
+    gh._sync_inline(Settings(), PullRequestEvent("o", "r", 3), [], "github-actions[bot]")
 
 
 def test_post_review_routes_findings(monkeypatch):
     monkeypatch.setattr(
         gh, "fetch_changed_files", lambda s, e: [ChangedFile("a.py", "modified", "@@ -1 +1,2 @@\n+x\n+y")]
     )
+    monkeypatch.setattr(gh, "_our_login", lambda s: "github-actions[bot]")
     summary, inline = {}, {}
     monkeypatch.setattr(
-        gh, "_sync_summary", lambda s, e, f, u: summary.update(findings=f, unanchored=u)
+        gh, "_sync_summary", lambda s, e, f, u, login: summary.update(findings=f, unanchored=u)
     )
-    monkeypatch.setattr(gh, "_sync_inline", lambda s, e, a: inline.update(anchored=a))
+    monkeypatch.setattr(gh, "_sync_inline", lambda s, e, a, login: inline.update(anchored=a))
     findings = [Finding("a.py", 1, "high", "anchored"), Finding("a.py", 99, "low", "floating")]
     gh.post_review(Settings(), PullRequestEvent("o", "r", 3), findings)
     assert [f.message for f in inline["anchored"]] == ["anchored"]
