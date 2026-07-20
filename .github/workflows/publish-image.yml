@@ -9,6 +9,7 @@ on:
     paths:
       - "Dockerfile"
       - "requirements.txt"
+      - "requirements.lock"
       - "src/**"
       - ".github/workflows/publish-image.yml"
   workflow_dispatch:
@@ -33,6 +34,9 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      # A newly-disclosed CVE should stop us publishing an image every consumer's CI runs.
+      - run: pipx run pip-audit -r requirements.lock
 
       - uses: docker/build-push-action@v6
         with:
