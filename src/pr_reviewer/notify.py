@@ -59,4 +59,6 @@ def notify_slack(settings, event, findings: list) -> None:
         resp.raise_for_status()
         log.info("posted review summary to Slack")
     except Exception as exc:  # best-effort: never fail the build on a notify error
-        log.warning("slack notify failed (ignored): %s", exc)
+        # requests renders connection errors with host and path split apart, so the
+        # unguessable webhook path lands in the Actions log unmasked if we log exc's text.
+        log.warning("slack notify failed (ignored): %s", type(exc).__name__)

@@ -45,6 +45,20 @@ def test_swallows_post_errors(monkeypatch):
     notify.notify_slack(settings, PullRequestEvent("o", "r", 7), [])
 
 
+def test_swallowed_error_does_not_leak_webhook_path(monkeypatch, caplog):
+    settings = Settings()
+    settings.slack_webhook = "https://hooks.slack.com/services/T000/B000/XXXX"
+    secret_path = "/services/T000/B000/XXXXSECRETXXXX"
+
+    def fake_post(*a, **k):
+        raise RuntimeError(f"Connection refused: host=hooks.slack.com path={secret_path}")
+
+    monkeypatch.setattr(notify.requests, "post", fake_post)
+    with caplog.at_level("WARNING"):
+        notify.notify_slack(settings, PullRequestEvent("o", "r", 7), [])
+    assert secret_path not in caplog.text
+
+
 def test_rejects_non_slack_webhook(monkeypatch):
     settings = Settings()
     settings.slack_webhook = "http://attacker.example/exfil"

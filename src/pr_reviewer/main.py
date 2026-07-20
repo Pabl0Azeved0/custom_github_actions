@@ -36,7 +36,9 @@ def run() -> int:
         notify_slack(settings, event, findings)
         log.info("review complete: %d finding(s)", len(findings))
     except Exception as exc:  # hard rule: never fail the build on our own error
-        log.warning("pr-reviewer degraded, skipping review: %s", exc)
+        # requests renders connection errors with host and path split apart, so the
+        # unguessable webhook path lands in the Actions log unmasked if we log exc's text.
+        log.warning("pr-reviewer degraded, skipping review: %s", type(exc).__name__)
         return 0
     if settings.fail_on_findings and findings:
         return 1
