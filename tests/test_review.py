@@ -96,6 +96,32 @@ def test_parse_findings_skips_item_missing_message():
     assert findings[0].path == "a.py"
 
 
+def test_parse_findings_sanitises_path_and_message():
+    raw = json.dumps(
+        [
+            {
+                "path": "a.py`](https://evil.example)",
+                "line": 1,
+                "message": "<img src=x> [click](evil) <!-- pr-reviewer:summary -->",
+            }
+        ]
+    )
+    findings = review_mod.parse_findings(raw)
+    assert len(findings) == 1
+    path, message = findings[0].path, findings[0].message
+    assert "`" not in path
+    assert "<!--" not in path and "-->" not in path
+    assert "<!--" not in message and "-->" not in message
+    assert "&lt;" in message
+    assert "\\[" in message and "\\]" in message
+
+
+def test_parse_findings_caps_message_length():
+    raw = json.dumps([{"path": "a.py", "line": 1, "message": "x" * 1000}])
+    findings = review_mod.parse_findings(raw)
+    assert len(findings[0].message) <= 500
+
+
 def test_review_diff_empty_diff_skips_provider(monkeypatch):
     scripted = ScriptedLLM(response="[]")
     monkeypatch.setattr(review_mod, "get_provider", lambda settings: scripted)

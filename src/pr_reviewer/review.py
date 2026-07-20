@@ -66,6 +66,21 @@ Reminder: return ONLY a JSON array of objects with keys path, line, severity, me
 Return [] if there is nothing to report. Report at most {settings.max_findings} findings."""
 
 
+# The diff can steer the model (see the prompt fence above), so its output is untrusted and
+# goes straight into PR markdown. Bound it and neutralise markdown/HTML/marker syntax.
+_COMMENT_MARKUP = re.compile(r"<!--|-->")
+
+
+def _clean_path(value: str) -> str:
+    return _COMMENT_MARKUP.sub("", str(value)).replace("`", "").replace("\n", " ")[:255].strip()
+
+
+def _clean_message(value: str) -> str:
+    text = _COMMENT_MARKUP.sub("", str(value)).replace("\n", " ")
+    text = text.replace("<", "&lt;").replace("[", "\\[").replace("]", "\\]")
+    return text[:500].strip()
+
+
 def parse_findings(raw: str) -> "list[Finding]":
     """Parse the LLM's raw response into Finding objects, tolerating malformed output."""
     text = raw.strip()
@@ -92,6 +107,8 @@ def parse_findings(raw: str) -> "list[Finding]":
             continue
         path = item.get("path")
         message = item.get("message")
+        path = _clean_path(path or "")
+        message = _clean_message(message or "")
         if not path or not message:
             continue
         try:
