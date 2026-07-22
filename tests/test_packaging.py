@@ -26,3 +26,9 @@ def test_workflow_actions_are_pinned_to_shas():
     assert refs
     for ref in refs:
         assert re.fullmatch(r"[^@]+@[0-9a-f]{40}", ref), f"{ref} is not pinned to a SHA"
+
+
+def test_readme_warns_against_pull_request_target():
+    # The README is still a stub in places; the trigger warning must survive its rewrite.
+    readme = (_ROOT / "README.md").read_text()
+    assert "Do not switch this action to `pull_request_target`" in readme

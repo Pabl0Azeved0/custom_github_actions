@@ -35,6 +35,16 @@ jobs:
           # fail-on-findings: "false"
 ```
 
+### Trigger: `pull_request` only
+
+**Do not switch this action to `pull_request_target`.** That trigger runs with your full
+secrets while the workspace holds the PR author's code, so it hands an untrusted contributor
+the LLM key, the `GITHUB_TOKEN`, and the runner.
+
+Fork PRs are not reviewed, by design: GitHub gives them a read-only token and no `secrets.*`,
+so the action logs that it is skipping and exits 0. `pull_request_target` is the usual
+workaround for that and it is not worth the trade here.
+
 ## Inputs
 
 <!-- TODO: table generated from action.yml. -->
