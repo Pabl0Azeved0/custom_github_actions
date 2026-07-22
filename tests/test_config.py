@@ -1,4 +1,5 @@
 import pytest
+import requests
 
 from pr_reviewer.config import Settings
 from pr_reviewer.llm.groq_provider import GroqProvider
@@ -44,6 +45,25 @@ def test_get_provider_groq():
     s.llm_provider = "groq"
     s.llm_api_key = "key"
     assert isinstance(get_provider(s), GroqProvider)
+
+
+def test_groq_request_caps_output_tokens(monkeypatch):
+    sent = {}
+
+    class _Resp:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"choices": [{"message": {"content": "[]"}}]}
+
+    def fake_post(url, headers=None, json=None, timeout=None):
+        sent.update(json)
+        return _Resp()
+
+    monkeypatch.setattr(requests, "post", fake_post)
+    assert GroqProvider("key", "model").generate("prompt") == "[]"
+    assert sent["max_tokens"] == 2048
 
 
 def test_get_provider_requires_key():

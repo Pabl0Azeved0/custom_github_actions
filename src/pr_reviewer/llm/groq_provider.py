@@ -18,6 +18,9 @@ class GroqProvider(LLMProvider):
                 json={
                     "model": self._model,
                     "messages": [{"role": "user", "content": prompt}],
+                    # An injected diff can ask for an endless answer; max-findings JSON
+                    # needs far less than this, so cap what we pay for and parse.
+                    "max_tokens": 2048,
                 },
                 timeout=120,
             )
