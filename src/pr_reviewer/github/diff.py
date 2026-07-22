@@ -38,7 +38,16 @@ def _glob_to_regex(pattern: str) -> "re.Pattern[str]":
     return re.compile("(?s:" + "".join(out) + r")\Z")
 
 
+# A glob like `**/*a*a*a*b` compiles to nested unbounded quantifiers, which backtrack
+# super-linearly in the length of the path being matched. The path comes from the PR
+# author, so bound it: real repo paths are far shorter than this.
+_MAX_MATCH_PATH = 512
+
+
 def is_excluded(path: str, patterns: list[str]) -> bool:
+    if len(path) > _MAX_MATCH_PATH:
+        log.warning("path over %d chars not matched against exclude patterns", _MAX_MATCH_PATH)
+        return False
     return any(_glob_to_regex(pat).match(path) for pat in patterns)
 
 

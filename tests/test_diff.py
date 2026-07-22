@@ -1,3 +1,5 @@
+import time
+
 from pr_reviewer.config import Settings
 from pr_reviewer.github import client, diff
 from pr_reviewer.models import ChangedFile, PullRequestEvent
@@ -88,3 +90,11 @@ def test_collect_diff_truncates(monkeypatch):
     s.max_diff_bytes = 50
     out = diff.collect_diff(s, PullRequestEvent("o", "r", 1))
     assert "truncated" in out
+
+
+def test_long_path_skips_pathological_matching():
+    # `**/*a*a*a*a*b` backtracks super-linearly; an attacker-supplied path must not
+    # be able to grow the input it backtracks over.
+    started = time.time()
+    assert not diff.is_excluded("a" * 4096, ["**/*a*a*a*a*b"])
+    assert time.time() - started < 0.1
